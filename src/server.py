@@ -6,7 +6,6 @@ from typing import Any
 
 PROJECT_ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR_PATH = (PROJECT_ROOT_DIR / "data")
-SRC_DIR_PATH = (PROJECT_ROOT_DIR/"src")
 
 def _validate_alcohol_related_field(value: Any) -> bool|None:
     if value in (None, ""):
@@ -69,8 +68,8 @@ class Cocktail(BaseModel):
 server = FastMCP(
     name="main_server",
     instructions="""
-        Serwer który odpowiada na pytania dotyczące koktajli zawartych w bazie danych.
-        Może też proponować koktajle na podstawie preferencji smakowych czy składników.
+        Answers questions about cocktails in .json file.
+        Suggests cocktails based on taste preferences, preffered ingredients, etc.
     """,
 )
 def load_cocktails_data():
@@ -79,10 +78,10 @@ def load_cocktails_data():
         with cocktail_dataset_path.open('r', encoding='utf-8') as file:
             raw_data: list[dict[str,Any]] = json.load(file)
     except FileNotFoundError:
-        print(f"Nie znaleziono pliku {cocktail_dataset_path}.")
+        print(f"File {cocktail_dataset_path} not found.")
         return []
     except json.JSONDecodeError as e:
-        print(f"Błąd podczas parsowania.\nLOG: {e}")
+        print(f"Parsing error.\nLOG: {e}")
         return []
 
     cocktails: list[Cocktail] = []
@@ -92,14 +91,14 @@ def load_cocktails_data():
 
         except ValidationError as e:
             cocktail_id = entry.get("id", "<brak_id>")
-            print(f"Bład podczas validowania. Pomijam {cocktail_id} LOG: {e}")
+            print(f"Validation error. Skipping {cocktail_id} LOG: {e}")
 
     return cocktails
 
 @server.tool(
     name="get_info_by_name",
     description="""
-            Return information about specific cocktails.
+            Tells user informations about cocktail.
         """,
 )
 def get_cocktail_info(name:str) -> dict|None:
@@ -115,7 +114,7 @@ def get_cocktail_info(name:str) -> dict|None:
 @server.tool(
     name="get_ingredient_info",
     description="""
-            Return information about specific ingredient.
+            Tells user information about ingredient.
     """,
 )
 def get_ingredient_info(name:str) -> dict|None:
@@ -133,7 +132,27 @@ def get_ingredient_info(name:str) -> dict|None:
 
     return None
 
+@server.tool(
+    name="suggest_cocktail_based_on_ingredients",
+    description="""
+        Suggests cocktails to the user based
+        on the igredients that are mentioned.
+    """,
+)
+def suggest_cocktails_based_on_ingredients(ingredients: list[str], limit:int = 5) -> dict:
+    ingredients_lower = {ing.lower() for ing in ingredients}
+    results = []
+    for cocktail in COCKTAILS:
+        matches = 0
+        for ingr in cocktail.ingredients:
+            if ingr.name and (ingr.name.lower() in ingredients_lower):
+                matches += 1
+        if matches:
+            results.append({"name":cocktail.name, "matches": matches})
+    results = sorted(results, key=lambda cocktail: cocktail["matches"], reverse=True)
+    return {"suggested_cocktails": results[:limit]}
+
 COCKTAILS = load_cocktails_data()
 
 if __name__ == "__main__":
-    server.run()
+    server.run(transport="http", host="127.0.0.1", port=8000)
