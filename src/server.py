@@ -96,6 +96,44 @@ def load_cocktails_data():
 
     return cocktails
 
+@server.tool(
+    name="get_info_by_name",
+    description="""
+            Return information about specific cocktails.
+        """,
+)
+def get_cocktail_info(name:str) -> dict|None:
+    cocktail = None
+    for curr_cocktail in COCKTAILS:
+        if curr_cocktail.name.lower() == name.lower():
+            cocktail = curr_cocktail
+            break
+    if cocktail != None:
+        return cocktail.model_dump()
+    return None
+
+@server.tool(
+    name="get_ingredient_info",
+    description="""
+            Return information about specific ingredient.
+    """,
+)
+def get_ingredient_info(name:str) -> dict|None:
+    ingredient = None
+    for curr_cocktail in COCKTAILS:
+        found = False
+        for curr_ingredient in curr_cocktail.ingredients:
+            if curr_ingredient.name.lower() == name.lower():
+                ingredient = curr_ingredient
+                found = True
+                break
+        if found: break
+
+    if ingredient: return ingredient.model_dump()
+
+    return None
+
+COCKTAILS = load_cocktails_data()
+
 if __name__ == "__main__":
-    cocktails = load_cocktails_data()
     server.run()
