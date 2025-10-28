@@ -68,11 +68,23 @@ class Cocktail(BaseModel):
 server = FastMCP(
     name="main_server",
     instructions="""
-        Answers questions about cocktails in .json file.
+        Answers questions about cocktails.
         Suggests cocktails based on taste preferences, preffered ingredients, etc.
     """,
 )
-def load_cocktails_data():
+
+def load_ingredients_data() -> list[Ingredient]:
+    ingredients: list[Ingredient] = []
+    for cocktail in COCKTAILS:
+        for ingredient in cocktail.ingredients:
+            # Ignore measure to avoid dupplicates in INGREDIENTS list
+            copy = ingredient.model_copy(update={"measure":None})
+            if (copy not in ingredients):
+                ingredients.append(copy)
+
+    return ingredients
+
+def load_cocktails_data() -> list[Cocktail]:
     cocktail_dataset_path = (DATA_DIR_PATH / "cocktail_dataset.json").resolve()
     try:
         with cocktail_dataset_path.open('r', encoding='utf-8') as file:
@@ -90,7 +102,7 @@ def load_cocktails_data():
             cocktails.append(Cocktail.model_validate(entry))
 
         except ValidationError as e:
-            cocktail_id = entry.get("id", "<brak_id>")
+            cocktail_id = entry.get("id", "<missing_id")
             print(f"Validation error. Skipping {cocktail_id} LOG: {e}")
 
     return cocktails
@@ -101,15 +113,12 @@ def load_cocktails_data():
             Tells user informations about cocktail.
         """,
 )
-def get_cocktail_info(name:str) -> dict|None:
-    cocktail = None
+def get_cocktail_info(name:str) -> dict:
     for curr_cocktail in COCKTAILS:
         if curr_cocktail.name.lower() == name.lower():
-            cocktail = curr_cocktail
-            break
-    if cocktail != None:
-        return cocktail.model_dump()
-    return None
+            return curr_cocktail.model_dump()
+
+    return {'error':'Not found'}
 
 @server.tool(
     name="get_ingredient_info",
@@ -117,20 +126,12 @@ def get_cocktail_info(name:str) -> dict|None:
             Tells user information about ingredient.
     """,
 )
-def get_ingredient_info(name:str) -> dict|None:
-    ingredient = None
-    for curr_cocktail in COCKTAILS:
-        found = False
-        for curr_ingredient in curr_cocktail.ingredients:
-            if curr_ingredient.name.lower() == name.lower():
-                ingredient = curr_ingredient
-                found = True
-                break
-        if found: break
+def get_ingredient_info(name:str) -> dict:
+    for ingredient in INGREDIENTS:
+        if ingredient.name and (ingredient.name.lower() == name.lower()):
+            return ingredient.model_dump()
 
-    if ingredient: return ingredient.model_dump()
-
-    return None
+    return {'error':'Not found'}
 
 @server.tool(
     name="suggest_cocktail_based_on_ingredients",
@@ -139,7 +140,7 @@ def get_ingredient_info(name:str) -> dict|None:
         on the igredients that are mentioned.
     """,
 )
-def suggest_cocktails_based_on_ingredients(ingredients: list[str], limit:int = 5) -> dict:
+def suggest_cocktails_based_on_ingredients(ingredients: list[str], limit:int = 3) -> dict:
     ingredients_lower = {ing.lower() for ing in ingredients}
     results = []
     for cocktail in COCKTAILS:
@@ -153,6 +154,7 @@ def suggest_cocktails_based_on_ingredients(ingredients: list[str], limit:int = 5
     return {"suggested_cocktails": results[:limit]}
 
 COCKTAILS = load_cocktails_data()
+INGREDIENTS = load_ingredients_data()
 
 if __name__ == "__main__":
     server.run(transport="http", host="127.0.0.1", port=8000)
