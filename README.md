@@ -2,6 +2,8 @@
 Implementation of MCP using FastMCP, integrated with a RAG system built on LlamaIndex.
 The tool answers questions about cocktails and their ingredients, and can suggest drinks based on given ingredients or flavor preferences.
 
+# Video preview - [> here <](https://youtu.be/XrUeqt3Ih5A)
+
 # Installation
 1. Clone this repo `git clone git@github.com:Tachakar/solvro-mcp-rag.git` and run `cd solvro-mcp-rag`
 2. Make sure you have installed [uv](https://github.com/astral-sh/uv)
