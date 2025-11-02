@@ -7,7 +7,7 @@ from llama_index.core import Document, Settings, VectorStoreIndex
 from pathlib import Path
 import json
 from typing import Any
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 PROJECT_ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR_PATH = PROJECT_ROOT_DIR / "data"
@@ -24,10 +24,10 @@ Settings.embed_model = EMBED_MODEL
 
 
 def _validate_alcohol_related_field(value: Any) -> bool | None:
-    if value in (None, ""):
-        return None
     if isinstance(value, bool):
         return value
+    if value in (None, ""):
+        return None
     try:
         return bool(int(value))
     except (ValueError, TypeError):
@@ -35,8 +35,6 @@ def _validate_alcohol_related_field(value: Any) -> bool | None:
 
 
 class Ingredient(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
     id: int
     name: str
     description: str | None = None
@@ -53,8 +51,6 @@ class Ingredient(BaseModel):
 
 
 class Cocktail(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
     id: int
     name: str
     category: str | None = None
@@ -142,10 +138,11 @@ def cocktail_to_document(c: Cocktail) -> Document:
 
 def build_indexes(cocktails: list[Cocktail]) -> VectorStoreIndex:
     documents = [cocktail_to_document(c) for c in cocktails]
-    nodes = SimpleNodeParser.from_defaults().get_nodes_from_documents(documents)
+    parser = SimpleNodeParser()
+    nodes = parser.get_nodes_from_documents(documents=documents, show_progress=True)
     return VectorStoreIndex(nodes)
 
-def get_cocktails_query_engine():
-    index = build_indexes(COCKTAILS)
-    retriever = VectorIndexRetriever(index=index, similarity_top_k=5)
+def get_cocktails_query_engine(top_k:int = 10):
+    indexes = build_indexes(COCKTAILS)
+    retriever = VectorIndexRetriever(index=indexes, similarity_top_k=top_k)
     return RetrieverQueryEngine(retriever=retriever)

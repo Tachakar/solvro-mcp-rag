@@ -1,6 +1,7 @@
+from typing import Optional
 from fastmcp import FastMCP
 from rag import COCKTAILS, INGREDIENTS, get_cocktails_query_engine
-
+import asyncio
 server = FastMCP(
     name="main_server",
     instructions="""
@@ -15,7 +16,7 @@ query_engine = get_cocktails_query_engine()
         Answers general questions about cocktails and ingredients.
     """
 )
-def ask_question(question:str)-> dict:
+def query_rag(question:str)-> dict:
     response = query_engine.query(question)
     return {"answer": str(response)}
 
@@ -52,15 +53,14 @@ def get_ingredient_info(name: str) -> dict:
 
 @server.tool(
     description="""
-        Suggests cocktails to the user based
-        on the ingredients that are mentioned.
+        Suggests cocktails based on the ingredients.
     """,
 )
 def suggest_cocktails_based_on_ingredients(
     ingredients: list[str], limit: int = 3
 ) -> dict:
     ingredients_lower = {ing.lower() for ing in ingredients}
-    results = []
+    results: list[dict[str, str|int]] = []
     for cocktail in COCKTAILS:
         matches = 0
         for ingr in cocktail.ingredients:
@@ -71,7 +71,15 @@ def suggest_cocktails_based_on_ingredients(
     results = sorted(results, key=lambda cocktail: cocktail["matches"], reverse=True)
     return {"suggested_cocktails": results[:limit]}
 
-
+@server.tool(
+    description="""
+        Suggest cocktail based on taste preferences.
+    """
+)
+def suggest_cocktails_based_on_taste(pref: list[str], alcoholic: Optional[bool] = None, limit:int = 3) -> dict:
+    query = f"Return {limit} cocktails with taste nodes: {', '.join(pref)}{f", they must be {"alcoholic" if alcoholic else "non-alcoholic"}" if isinstance(alcoholic,bool) else ""}"
+    response = query_engine.query(query)
+    return {"answer": str(response)}
 
 if __name__ == "__main__":
     server.run(transport="http", host="127.0.0.1", port=8000)
